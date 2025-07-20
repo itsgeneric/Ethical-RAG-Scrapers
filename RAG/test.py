@@ -31,7 +31,7 @@ def build_combined_prompt(content: str) -> str:
     return f"""
 You are a helpful assistant. Given the following article content, do the following:
 
-1. Summarize the content in less than 50 words.
+1. Summarize the content meaningfully in around 50 words.
 2. Extract at least 3 important keywords from the content, formatted as a single comma-separated line.
 
 Respond in this exact format:
