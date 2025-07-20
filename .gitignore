@@ -1,6 +1,5 @@
 .env
 .gitattributes
-.DS_Store
 Python Interpreter files
 .venv
 
