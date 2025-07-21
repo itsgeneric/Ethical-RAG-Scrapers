@@ -2,6 +2,6 @@
 .gitattributes
 Python Interpreter files
 .venv
-
+venv
 IDE files
 .idea
