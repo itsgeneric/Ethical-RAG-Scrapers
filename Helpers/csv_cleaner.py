@@ -1,7 +1,7 @@
 import csv
 
-input_file = "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/merged.csv"
-output_file = "../clean_merged_30k.csv"
+input_file = "cleaned_file.csv"
+output_file = "clean_merged_5k.csv"
 
 seen_rows = set()
 rows_written = 0
