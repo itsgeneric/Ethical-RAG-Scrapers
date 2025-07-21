@@ -3,8 +3,8 @@ import requests
 from sentence_transformers import SentenceTransformer
 import time
 
-# Load first 10 rows of the CSV
-df = pd.read_csv("../Merged Datasets/cleaned_dataset.csv").head(10)
+# Load first 5000 rows of the CSV
+df = pd.read_csv("../Merged Datasets/cleaned_dataset.csv").head(5000)
 
 # Load Hugging Face embedding model
 embed_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -59,6 +59,8 @@ summaries, keywords_list, embeddings = [], [], []
 
 # Process rows
 for idx, row in df.iterrows():
+    print(f"Embedding row {idx + 1}/{len(df)}") # Count progress
+
     content = str(row['content'])[:4000]  # avoid overload
     prompt = build_combined_prompt(content)
     response = ollama_query(prompt)
@@ -84,5 +86,5 @@ df['keywords'] = keywords_list
 df['embedding'] = embeddings
 
 # Save to new CSV
-df.to_csv("../Merged Datasets/test_10.csv", index = False)
-print("✅ Done. Output saved to '../Merged Datasets/test_10.csv'")
+df.to_csv("../Merged Datasets/First_5k.csv", index = False)
+print("✅ Done. Output saved to '../Merged Datasets/First_5k.csv'")
