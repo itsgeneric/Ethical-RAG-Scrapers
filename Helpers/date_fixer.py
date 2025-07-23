@@ -71,4 +71,4 @@ if __name__ == "__main__":
     csv_file = '../Merged Datasets/improper_clean_merged_15k-20k.csv'
 
     # Method 1: Apply-based approach (easier to understand)
-    convert_date_format(csv_file, '../Embeddings/clean_merged_15k-20k.csv')
+    convert_date_format(csv_file, '../RAG/Embeddings/clean_merged_15k-20k.csv')

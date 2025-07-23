@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 import time
 
 # Load 5k rows from the cleaned dataset
-df = pd.read_csv("../Merged Datasets/cleaned_dataset.csv", skiprows=range(1, 20001), nrows=5000)
+df = pd.read_csv("../Merged Datasets/noEmbedding_cleaned_dataset.csv", skiprows=range(1, 20001), nrows=5000)
 
 # Load Hugging Face embedding model
 embed_model = SentenceTransformer('all-MiniLM-L6-v2')
