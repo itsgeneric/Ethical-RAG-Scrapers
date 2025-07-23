@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load CSV
-df = pd.read_csv("../Merged Datasets/First_5k.csv")
+df = pd.read_csv("../Merged Datasets/Fifth_5k.csv")
 
 # Clean up summary and keywords columns for comparison
 df['summary_clean'] = df['summary'].fillna('').str.strip().str.lower()

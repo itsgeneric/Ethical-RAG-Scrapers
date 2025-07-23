@@ -1,7 +1,7 @@
 import csv
 
 input_file = "cleaned_file.csv"
-output_file = "clean_merged_5k.csv"
+output_file = "../Embeddings/clean_merged_20k-25k.csv"
 
 seen_rows = set()
 rows_written = 0
