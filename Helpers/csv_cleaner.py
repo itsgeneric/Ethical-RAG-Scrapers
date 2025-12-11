@@ -1,7 +1,10 @@
 import csv
+import sys
 
-input_file = "cleaned_file.csv"
-output_file = "../RAG/Embeddings/clean_merged_20k-25k.csv"
+csv.field_size_limit(2**31 - 1)
+
+input_file = "embeded_arxiv.csv"
+output_file = "../NEW Merged Datasets/arxiv_embeded.csv"
 
 seen_rows = set()
 rows_written = 0

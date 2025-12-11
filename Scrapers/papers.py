@@ -1,321 +1,158 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+from urllib.parse import urlparse
 import os
 import time
-from datetime import datetime
-from urllib.parse import urlparse
-from datetime import datetime
+import re
 
-# ---------------- Config ----------------
-OUTPUT_DIR = "scraped_papers"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "research_papers.csv")
-FIELDS = ["title", "content", "date", "url", "author", "domain", "categories"]
-MAX_ARTICLES = 1000  # Total articles to scrape
+# Configuration
+# Folder containing your .txt files with arXiv URLs
+ARXIV_TXT_DIR = "arxiv_txt"
+HEADERS = {"User-Agent": "Mozilla/5.0 (Research Project; mailto:your_email@example.com)"}
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ResearchScraper/1.0)"
-}
 
-# ---------------- Helper Functions ----------------
+# Step 1: Read URLs from local text file
+def extract_urls_from_txt(path, limit=None):
+    with open(path, "r", encoding="utf-8") as file:
+        # Filter out empty lines and ensure valid URLs
+        urls = [line.strip() for line in file if line.strip().startswith("http")]
+        return urls[:limit] if limit else urls
 
-def extract_domain(url):
-    return urlparse(url).netloc
 
-def clean_text(text):
-    return text.strip().replace("\n", " ").replace("\r", "")[:5000] if text else "N/A"
+# Get all .txt files from the directory
+if not os.path.exists(ARXIV_TXT_DIR):
+    os.makedirs(ARXIV_TXT_DIR)
+    print(f"⚠️ Created folder '{ARXIV_TXT_DIR}'. Please put your URL text files inside it.")
+    exit()
 
-# ---------------- Scrapers ----------------
+txt_files = [f for f in os.listdir(ARXIV_TXT_DIR) if f.endswith('.txt')]
+txt_files.sort()
 
-def scrape_arxiv_paginated(query="machine learning", total_articles=1000):
-    print("🔎 Scraping arXiv with pagination...")
-    articles = []
-    BATCH = 100
-    start = 0
 
-    while len(articles) < total_articles:
-        try:
-            print(f"➡️ arXiv batch {start}–{start+BATCH}")
-            api_url = f"https://export.arxiv.org/api/query?search_query=all:{query.replace(' ', '+')}&start={start}&max_results={BATCH}"
-            response = requests.get(api_url, headers=HEADERS)
-            soup = BeautifulSoup(response.text, features="xml")
-            entries = soup.find_all("entry")
-
-            if not entries:
-                break  # No more results
-
-            for entry in entries:
-                title = clean_text(entry.title.text)
-                content = clean_text(entry.summary.text)
-                url = entry.id.text
-                date = entry.published.text.split("T")[0] if entry.published else datetime.now().strftime("%Y-%m-%d")
-                authors = ", ".join([a.find("name").text for a in entry.find_all("author")])
-                domain = extract_domain(url)
-                categories = ", ".join([c['term'] for c in entry.find_all("category")])
-
-                if (title and content and url):
-                    articles.append({
-                        "title": title,
-                        "content": content,
-                        "date": date,
-                        "url": url,
-                        "author": authors or "Multiple Authors",
-                        "domain": domain,
-                        "categories": categories or "arxiv, research"
-                    })
-
-                if len(articles) >= total_articles:
-                    break
-
-            start += BATCH
-            time.sleep(1)
-
-        except Exception as e:
-            print(f"[Error] arXiv pagination failed: {e}")
-            break
-
-    print(f"✅ Total arXiv records: {len(articles)}")
-    return articles
-
-def scrape_plos_paginated(total_articles=400):
-    print("🔎 Scraping PLOS ONE with pagination...")
-    articles = []
-    page = 0
-
-    while len(articles) < total_articles:
-        try:
-            url_page = f"https://journals.plos.org/plosone/browse?resultView=cards&page={page}"
-            res = requests.get(url_page, headers=HEADERS)
-            res.raise_for_status()
-            soup = BeautifulSoup(res.text, 'html.parser')
-            links = soup.select("a[href^='/plosone/article']")
-
-            if not links:
-                break
-
-            for link in links:
-                href = link.get("href", "")
-                full_url = "https://journals.plos.org" + href
-                if len(articles) >= total_articles:
-                    break
-
-                try:
-                    art_res = requests.get(full_url, headers=HEADERS)
-                    art_soup = BeautifulSoup(art_res.text, "html.parser")
-
-                    title_tag = art_soup.find("h1")
-                    content_tag = art_soup.find("div", class_="abstract")
-                    authors = art_soup.select("ul.authors li")
-                    author_str = ", ".join(a.get_text(strip=True) for a in authors) or "PLOS Editorial Team"
-
-                    date_tag = art_soup.find("meta", {"name": "citation_publication_date"})
-                    date = date_tag["content"] if date_tag else datetime.now().strftime("%Y-%m-%d")
-
-                    article = {
-                        "title": clean_text(title_tag.text if title_tag else "Untitled"),
-                        "content": clean_text(content_tag.text if content_tag else "No summary."),
-                        "date": date,
-                        "url": full_url,
-                        "author": author_str,
-                        "domain": "journals.plos.org",
-                        "categories": "science, public health, biology, plos",
-                    }
-
-                    if all(article.values()) and len(article["content"]) > 50:
-                        articles.append(article)
-
-                except Exception as e:
-                    print(f"[PLOS 🚫] Skipped article: {e}")
-
-            page += 1
-            time.sleep(1)
-
-        except Exception as e:
-            print(f"[PLOS ❌] Page fetch failed: {e}")
-            break
-
-    print(f"✅ Total PLOS articles collected: {len(articles)}")
-    return articles
-
-def scrape_biorxiv(query="neuro", max_articles=200):
-    print("🔎 Scraping bioRxiv...")
-    articles = []
-    base_url = f"https://www.biorxiv.org/search/{query}%20numresults%3A100%20sort%3Arelevance-rank"
-
+# Step 2: Scraper logic specific to arXiv.org
+def extract_data_from_url(url):
     try:
-        response = requests.get(base_url, headers=HEADERS)
-        soup = BeautifulSoup(response.text, "html.parser")
-        preview_links = soup.select("span.highwire-cite-title > a")
+        r = requests.get(url, headers=HEADERS, timeout=15)
 
-        for tag in preview_links[:max_articles]:
-            try:
-                link = "https://www.biorxiv.org" + tag["href"]
-                art = requests.get(link, headers=HEADERS)
-                art_soup = BeautifulSoup(art.text, "html.parser")
+        # specific handling for 404/500 errors
+        if r.status_code != 200:
+            print(f"⚠️ Status {r.status_code} for {url}")
+            return None
 
-                title = art_soup.find("h1", class_="highwire-cite-title").get_text(strip=True)
-                abstract = art_soup.find("div", class_="section abstract").get_text(strip=True)
-                author_list = art_soup.select(".highwire-citation-authors span.highwire-citation-author")
-                authors = ", ".join(a.get_text(strip=True) for a in author_list)
-                date = datetime.now().strftime("%Y-%m-%d")
+        soup = BeautifulSoup(r.content, "html.parser")
 
-                articles.append({
-                    "title": clean_text(title),
-                    "content": clean_text(abstract),
-                    "date": date,
-                    "url": link,
-                    "author": authors or "bioRxiv Authors",
-                    "domain": "biorxiv.org",
-                    "categories": "neuroscience, life sciences, biorxiv"
-                })
+        # 1. Title (Strip the "Title:" prefix)
+        title_tag = soup.find("h1", class_="title")
+        if title_tag:
+            # Remove the <span class="descriptor">Title:</span> part
+            if title_tag.find("span", class_="descriptor"):
+                title_tag.find("span", class_="descriptor").decompose()
+            title = title_tag.get_text(strip=True)
+        else:
+            title = None
 
-                if len(articles) >= max_articles:
-                    break
+        # 2. Abstract/Content (Strip the "Abstract:" prefix)
+        abstract_tag = soup.find("blockquote", class_="abstract")
+        if abstract_tag:
+            if abstract_tag.find("span", class_="descriptor"):
+                abstract_tag.find("span", class_="descriptor").decompose()
+            content = abstract_tag.get_text(strip=True)
+        else:
+            content = None
 
-            except Exception as e:
-                print(f"[bioRxiv ❌] Skipped article: {e}")
-                continue
+        # 3. Authors (Strip "Authors:" prefix)
+        authors_tag = soup.find("div", class_="authors")
+        if authors_tag:
+            if authors_tag.find("span", class_="descriptor"):
+                authors_tag.find("span", class_="descriptor").decompose()
+            author = authors_tag.get_text(strip=True)
+        else:
+            author = None
 
-        print(f"✅ Total bioRxiv articles collected: {len(articles)}")
+        # 4. Date (Found in the dateline div)
+        # Format usually: "(Submitted on 1 Jan 2024)"
+        date_div = soup.find("div", class_="dateline")
+        date = date_div.get_text(strip=True) if date_div else None
+
+        # Optional: Clean up date string
+        if date:
+            date = date.replace("(Submitted on", "").replace(")", "").strip()
+
+        # 5. Categories/Subjects
+        # Found in: <td class="tablecell subjects">
+        subjects_tag = soup.find("td", class_="tablecell subjects")
+        categories = subjects_tag.get_text(strip=True) if subjects_tag else "General"
+
+        domain = urlparse(url).netloc
+
+        return {
+            "title": title,
+            "content": content,
+            "date": date,
+            "author": author,
+            "url": url,
+            "domain": domain,
+            "categories": categories,
+        }
 
     except Exception as e:
-        print(f"[bioRxiv ❌] Failed fetching main page: {e}")
+        print(f"❌ Error scraping {url}: {e}")
+        return {
+            "title": None,
+            "content": None,
+            "date": None,
+            "author": None,
+            "url": url,
+            "domain": urlparse(url).netloc,
+            "categories": "Unknown",
+        }
 
-    return articles
 
-def scrape_plos_paginated(total_articles=500):
-    print("🔎 Scraping PLOS ONE with pagination...")
-    articles = []
-    page = 0
-    BATCH = 20
+# Step 3: Process all .txt files
+print(f"🚀 Found {len(txt_files)} .txt files to process")
 
-    while len(articles) < total_articles:
-        try:
-            url_page = f"https://journals.plos.org/plosone/browse?resultView=cards&page={page}"
-            res = requests.get(url_page, headers=HEADERS)
-            soup = BeautifulSoup(res.text, 'html.parser')
-            links = soup.select("div.search-results-item-meta h2 a")
+for file_idx, txt_file in enumerate(txt_files, 1):
+    print(f"\n📁 Processing file {file_idx}/{len(txt_files)}: {txt_file}")
 
-            if not links:
-                break
+    txt_file_path = os.path.join(ARXIV_TXT_DIR, txt_file)
 
-            for link in links:
-                if len(articles) >= total_articles:
-                    break
+    # Extract URLs
+    urls = extract_urls_from_txt(txt_file_path)
+    print(f"   Found {len(urls)} URLs in {txt_file}")
 
-                try:
-                    url = "https://journals.plos.org" + link["href"]
-                    content_res = requests.get(url, headers=HEADERS)
-                    article_soup = BeautifulSoup(content_res.text, "html.parser")
+    data = []
 
-                    title = clean_text(link.text)
-                    abstract = article_soup.find("div", class_="abstract")
-                    content = clean_text(abstract.text) if abstract else "N/A"
+    # Process URLs
+    for url_idx, url in enumerate(urls, start=1):
+        print(f"   🔄 Scraping URL {url_idx}/{len(urls)}: {url}")
 
-                    author_tag = article_soup.select_one("ul.authors li")
-                    author = clean_text(author_tag.text) if author_tag else "PLOS Editorial Team"
+        result = extract_data_from_url(url)
 
-                    date_tag = article_soup.find("meta", {"name": "citation_publication_date"})
-                    pub_date = date_tag["content"] if date_tag else get_current_date()
+        if result:
+            data.append(result)
 
-                    if content != "N/A" and len(content) > 50:
-                        articles.append({
-                            "title": title,
-                            "content": content,
-                            "date": pub_date,
-                            "url": url,
-                            "author": author,
-                            "domain": extract_domain(url),
-                            "categories": "plos, open access, research"
-                        })
+        # CRITICAL: arXiv requires delays. Do not remove this sleep.
+        # Sleeping 3 seconds is safe.
+        time.sleep(3)
 
-                except Exception as e:
-                    print(f"[!] Error in PLOS URL: {e}")
-                    continue
+    # Step 4: Save to CSV
+    # Create output filename based on input txt name
+    csv_filename = txt_file.replace(".txt", ".csv")
 
-            page += 1
-            time.sleep(1)
+    # Ensure we don't overwrite if it exists, or maybe we want to?
+    # Current logic overwrites.
 
-        except Exception as e:
-            print(f"[!] PLOS scrape failed: {e}")
-            break
-
-    print(f"✅ Total PLOS ONE records: {len(articles)}")
-    return articles
-
-def scrape_nature(max_articles=100):
-    print("🔎 Scraping Nature...")
-    articles = []
     try:
-        url = "https://www.nature.com/news"
-        soup = BeautifulSoup(requests.get(url, headers=HEADERS).text, "html.parser")
-        items = soup.select("li.app-article-list-row__item")
-        for item in items[:max_articles]:
-            try:
-                a_tag = item.find("a", href=True)
-                link = "https://www.nature.com" + a_tag["href"]
-                detail = requests.get(link, headers=HEADERS)
-                detail_soup = BeautifulSoup(detail.text, "html.parser")
-                content_paragraphs = detail_soup.select("div.c-article-body p")
-                article = {
-                    "title": clean_text(a_tag.text),
-                    "content": clean_text(" ".join(p.text for p in content_paragraphs)),
-                    "date": get_date(),
-                    "url": link,
-                    "author": "Nature Editors",
-                    "domain": "nature.com",
-                    "categories": "Nature, research, science"
-                }
-                articles.append(article)
-            except:
-                continue
+        with open(csv_filename, "w", newline="", encoding="utf-8") as f:
+            fieldnames = ["title", "content", "date", "author", "url", "domain", "categories"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+
+        print(f"   ✅ Data saved to {csv_filename} ({len(data)} papers)")
+
     except Exception as e:
-        print(f"[!] Nature scrape failed: {e}")
-    print(f"✅ Nature articles: {len(articles)}")
-    return articles
+        print(f"   ❌ Error saving CSV: {e}")
 
-# ---------------- Save to CSV ----------------
-
-def save_to_csv(records):
-    with open(OUTPUT_FILE, "w", newline='', encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS)
-        writer.writeheader()
-        for row in records:
-            if all(row.get(k) and row[k] != "N/A" for k in FIELDS):  # Ensure no empty fields
-                writer.writerow(row)
-    print(f"✅ CSV saved: {OUTPUT_FILE} ({len(records)} entries)")
-
-# ---------------- Main ----------------
-
-def main():
-    print("🚀 Starting large-scale research scraper to gather 1000+ records...\n")
-
-    # arXiv pagination with multiple topics
-    arxiv = []
-    for query in ["machine learning", "climate", "neuroscience", "statistics"]:
-        arxiv += scrape_arxiv_paginated(query=query, total_articles=250)
-
-    # biorxiv
-    biorxiv = scrape_biorxiv(query="neuro", max_articles=300)
-
-    # plos paginated
-    plos = scrape_plos_paginated(total_articles=300)
-
-    # nature (smaller)
-    nature = scrape_nature(max_articles=50)
-
-    combined = arxiv + biorxiv + plos + nature
-
-    seen = set()
-    final = []
-    for row in combined:
-        if row["url"] not in seen:
-            seen.add(row["url"])
-            final.append(row)
-
-    print(f"\n✅ Final dataset size: {len(final)}")
-    save_to_csv(final)
-
-if __name__ == "__main__":
-    main()
+print("\n🎉 All files processed successfully!")

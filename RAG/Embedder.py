@@ -4,7 +4,8 @@ from sentence_transformers import SentenceTransformer
 import time
 
 # Load 5k rows from the cleaned dataset
-df = pd.read_csv("../Merged Datasets/noEmbedding_cleaned_dataset.csv", skiprows=range(1, 20001), nrows=5000)
+# df = pd.read_csv("../Merged Datasets/noEmbedding_cleaned_dataset.csv", skiprows=range(1, 20001), nrows=5000)
+df = pd.read_csv("../NEW Merged Datasets/arxiv.csv", nrows=5)
 
 # Load Hugging Face embedding model
 embed_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -86,5 +87,5 @@ df['keywords'] = keywords_list
 df['embedding'] = embeddings
 
 # Save to new CSV
-df.to_csv("../Merged Datasets/Fifth_5k.csv", index = False)
-print("✅ Done. Output saved to '../Merged Datasets/Fifth_5k.csv'")
+df.to_csv("../NEW Merged Datasets/embeded_arxiv.csv", index = False)
+print("✅ Done. Output saved")

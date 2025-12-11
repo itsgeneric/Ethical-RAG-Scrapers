@@ -1,20 +1,14 @@
 import csv
 import os
+import sys
+
+csv.field_size_limit(2**31 - 1)
 
 # List your CSV file names here
 csv_files = [
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/ap_news_articles.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/finance.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/legal_gov.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/research_papers.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/sciencedaily.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/tech_docs.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/tngo_articles.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/tribunal_docs.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/wanderingearl.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/wikipedia_articles_1.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/wikipedia_articles_2.csv",
-    "D:/BNMIT/Semester 7/Final Year Project/scraper/Datasets/worldhistory.csv",
+    # 'C:/Data/BNMIT/Semester 7/Final Year Project/scraper/new_datasets/arxiv.csv',
+    # 'C:/Data/BNMIT/Semester 7/Final Year Project/scraper/new_datasets/clean_science_daily.csv',
+    'C:/Data/BNMIT/Semester 7/Final Year Project/scraper/new_datasets/science_daily.csv',
 ]
 
 total_rows = 0

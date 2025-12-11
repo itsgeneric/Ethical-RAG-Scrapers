@@ -3,8 +3,8 @@ import glob
 import os
 
 # Define the directory containing all your CSVs
-input_folder = "../Embeddings"
-output_file = "../RAG/Embeddings/final_embeddings_merged.csv"
+input_folder = "../new_datasets/arxiv/"
+output_file = "../new_datasets/arxiv/arxiv.csv"
 
 # Use glob to get all CSV files in the directory
 csv_files = glob.glob(os.path.join(input_folder, "*.csv"))

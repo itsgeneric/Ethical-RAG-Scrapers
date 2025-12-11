@@ -1,20 +1,20 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
-import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
+import os
 
-# Step 1: Read first 12000 URLs from local sitemap file
-def extract_urls_from_sitemap(path, limit=12000):
+# Step 1: Read URLs from local sitemap file
+# Updated to read URLs from a plain text file (one URL per line)
+def extract_urls_from_txt(path, limit=10000):
     with open(path, "r", encoding="utf-8") as file:
-        tree = ET.parse(file)
-        root = tree.getroot()
-        ns = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-        urls = [url.find("ns:loc", ns).text for url in root.findall("ns:url", ns)]
+        urls = [line.strip() for line in file if line.strip()]
         return urls[:limit]
 
-sitemap_path = "/Users/user/Downloads/sitemap-releases-2024.txt"
-urls = extract_urls_from_sitemap(sitemap_path)
+# Get all .txt files from the sciencedaily_txt directory
+sciencedaily_txt_dir = r"C:\Data\BNMIT\Semester 7\Final Year Project\scraper\Scrapers\sciencedaily_txt"
+txt_files = [f for f in os.listdir(sciencedaily_txt_dir) if f.endswith('.txt')]
+txt_files.sort()  # Sort files to process them in order
 
 # Step 2: Scraper logic
 HEADERS = {"User-Agent": "Mozilla/5.0"}
@@ -71,17 +71,35 @@ def extract_data_from_url(url):
             "categories": "Science",
         }
 
-# Step 3: Extract and show progress
-data = []
-for idx, url in enumerate(urls, start=1):
-    print(f"🔄 Scraping URL {idx}/{len(urls)}: {url}")
-    result = extract_data_from_url(url)
-    data.append(result)
+# Step 3: Process all .txt files
+print(f"Found {len(txt_files)} .txt files to process")
 
-# Step 4: Save to CSV
-with open("sciencedaily.csv", "w", newline="", encoding="utf-8") as f:
-    writer = csv.DictWriter(f, fieldnames=["title", "content", "date", "author", "url", "domain", "categories"])
-    writer.writeheader()
-    writer.writerows(data)
+for file_idx, txt_file in enumerate(txt_files, 1):
+    print(f"\n📁 Processing file {file_idx}/{len(txt_files)}: {txt_file}")
 
-print("✅ Scraping complete. Data saved to sciencedaily.csv")
+    # Full path to the current txt file
+    txt_file_path = os.path.join(sciencedaily_txt_dir, txt_file)
+
+    # Extract URLs from current file
+    urls = extract_urls_from_txt(txt_file_path)
+    print(f"   Found {len(urls)} URLs in {txt_file}")
+
+    # Extract data from URLs
+    data = []
+    for url_idx, url in enumerate(urls, start=1):
+        print(f"   🔄 Scraping URL {url_idx}/{len(urls)}: {url}")
+        result = extract_data_from_url(url)
+        data.append(result)
+
+    # Step 4: Save to CSV (separate file for each year)
+    year = txt_file.replace("sitemap-releases-", "").replace(".txt", "")
+    csv_filename = f"sciencedaily_{year}.csv"
+
+    with open(csv_filename, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["title", "content", "date", "author", "url", "domain", "categories"])
+        writer.writeheader()
+        writer.writerows(data)
+
+    print(f"   ✅ Data saved to {csv_filename} ({len(data)} articles)")
+
+print("\n🎉 All files processed successfully!")

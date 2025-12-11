@@ -16,6 +16,7 @@ def convert_date_format(csv_file_path, output_file_path=None):
     # Read the CSV file
     df = pd.read_csv(csv_file_path)
 
+    # Function to convert date format
     def format_date(date_str):
         """Convert various date formats to Month DD, YYYY"""
         try:
@@ -26,11 +27,17 @@ def convert_date_format(csv_file_path, output_file_path=None):
             if not date_str or date_str.lower() == 'nan':
                 return date_str
 
+            # 🔹 Handle patterns like "[Submitted on 15 Feb 2005]"
+            # or any text that just contains a "15 Feb 2005" style date
+            m = re.search(r'\b\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}\b', date_str)
+            if m:
+                date_obj = pd.to_datetime(m.group(0))
+                return date_obj.strftime('%B %d, %Y')
+
             # Handle dates with extra time info like "2 November 2024, at 08:20(UTC)"
             if ', at ' in date_str or '(UTC)' in date_str:
                 # Extract just the date part before ", at"
                 date_part = date_str.split(', at')[0]
-                # Parse and reformat to standard Month DD, YYYY
                 date_obj = pd.to_datetime(date_part)
                 return date_obj.strftime('%B %d, %Y')
 
@@ -40,19 +47,15 @@ def convert_date_format(csv_file_path, output_file_path=None):
 
             # Handle ISO format with timezone (2024-08-20T12:38:45+05:30)
             if 'T' in date_str and ('+' in date_str or date_str.count('-') > 2):
-                # Extract just the date part (before 'T')
                 date_part = date_str.split('T')[0]
                 date_obj = pd.to_datetime(date_part)
                 return date_obj.strftime('%B %d, %Y')
 
-            # Handle simple date format (2025-07-19) or ISO without timezone
-            else:
-                # Use pandas to_datetime which handles multiple formats
-                date_obj = pd.to_datetime(date_str)
-                return date_obj.strftime('%B %d, %Y')
+            # Fallback: let pandas parse it
+            date_obj = pd.to_datetime(date_str)
+            return date_obj.strftime('%B %d, %Y')
 
         except (ValueError, TypeError, pd.errors.ParserError) as e:
-            # Return original value if conversion fails
             print(f"Warning: Could not convert date '{date_str}': {e}")
             return date_str
 
@@ -68,7 +71,7 @@ def convert_date_format(csv_file_path, output_file_path=None):
 
 # This script converts date formats in a CSV file from various formats to "Month DD, YYYY"
 if __name__ == "__main__":
-    csv_file = '../Merged Datasets/improper_clean_merged_15k-20k.csv'
+    csv_file = '../new_datasets/Backup/science_daily.csv'
 
     # Method 1: Apply-based approach (easier to understand)
-    convert_date_format(csv_file, '../RAG/Embeddings/clean_merged_15k-20k.csv')
+    convert_date_format(csv_file, '../NEW Merged Datasets/science_daily.csv')
