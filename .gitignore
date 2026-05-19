@@ -5,3 +5,8 @@ Python Interpreter files
 venv
 IDE files
 .idea
+
+pyproject.toml
+uv.lock
+.python-version
+.DS_Store
